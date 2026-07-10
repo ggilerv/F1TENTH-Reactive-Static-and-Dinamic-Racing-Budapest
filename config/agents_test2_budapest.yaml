@@ -1,8 +1,24 @@
 # Prueba 2 (Budapest): ego + 2 obstáculos dinámicos.
-# Los 3 agentes corren el mismo ftg_control; el ego tiene velocidad_max
-# mayor para distinguirse como el auto objetivo, los 2 obstáculos van a
-# velocidad moderada. El ego debe completar 10 vueltas consecutivas sin
-# colisión con ninguno de los dos.
+#
+# El ego corre `ftg_control_obstaculos` (el mismo controlador de la
+# Prueba 1) con `velocidad_max` alto para distinguirse como el auto
+# objetivo. Los 2 obstáculos corren `ftg_control` (paquete `f1_reactive`)
+# a velocidad moderada y con `sesgo_lateral` fijo — obstaculo_1 pegado a
+# la izquierda del carril, obstaculo_2 pegado a la derecha (ver
+# `README.md`) — para que el ego siempre tenga un hueco ancho y
+# predecible al lado contrario por el que rebasar, en vez de que la
+# posición lateral del obstáculo varíe con la geometría de cada tramo.
+# El ego debe completar 10 vueltas consecutivas sin colisión con
+# ninguno de los dos.
+#
+# obstaculo_1 está desplazado hacia una pared del carril inicial (no
+# centrado), para dejar un hueco lateral ancho y sin ambigüedad por el
+# que el ego pueda rebasar. obstaculo_2 está en una recta larga bien
+# separada, después de toda la zona de curvas cerradas (horquilla +
+# chicane) que sigue al tramo inicial — así el ego nunca tiene que
+# rebasar un auto Y encarar una curva exigente al mismo tiempo, que es
+# lo que causaba los choques. Su velocidad se mantiene baja (2.5 m/s)
+# para que el ego los alcance y rebase con margen de sobra.
 agents:
   - namespace: ego_racecar
     color: "0.3 0.57 1. 1."
@@ -13,14 +29,14 @@ agents:
 
   - namespace: obstaculo_1
     color: "1. 0.57 0.1 1."
-    velocidad_max: 4.0
-    sx: 6.88
-    sy: -5.80
+    velocidad_max: 2.5
+    sx: 2.67
+    sy: -3.20
     stheta: -0.70
 
   - namespace: obstaculo_2
     color: "1. 0.1 0.1 1."
-    velocidad_max: 4.0
-    sx: 11.47
-    sy: -9.66
-    stheta: -0.70
+    velocidad_max: 2.5
+    sx: 38.75
+    sy: 6.45
+    stheta: 0.785

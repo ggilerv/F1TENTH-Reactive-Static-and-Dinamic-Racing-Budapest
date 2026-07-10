@@ -43,11 +43,8 @@ paquete base del curso) ni `f1_reactive`.
   paredes de un pasillo continuo): burbuja de seguridad más amplia,
   frenado por proximidad frontal (no solo un cono angosto), histéresis en
   la elección de hueco para no dudar entre esquivar por un lado u otro, y
-  un tope de velocidad mayor en recta. Se conservan además dos copias de
-  respaldo (`ftg_node_obstaculos_respaldo.py`,
-  `ftg_node_obstaculos_respaldo2.py`) en puntos de ajuste anteriores ya
-  validados sin choques, por si un ajuste posterior resultara menos
-  confiable — ver [Parámetros principales](#parámetros-principales).
+  un tope de velocidad mayor en recta — ver
+  [Parámetros principales](#parámetros-principales).
 - **`lap_timer.py`** — cronómetro de vueltas (igual al de la Parte 1),
   extendido con detección de colisión: usa `/collisions` como fuente
   exacta cuando está disponible (Prueba 2), o una heurística de velocidad
@@ -58,7 +55,11 @@ paquete base del curso) ni `f1_reactive`.
 
 Evidencia de la Prueba 1 (obstáculos estáticos) completada de forma autónoma:
 
-https://youtu.be/vNRCDcRi82w
+https://youtu.be/K3QyUpit6mo
+
+Evidencia de la Prueba 2 (obstáculos dinámicos) completada de forma autónoma:
+
+https://youtu.be/0Ql4mPjTWYY
 
 ## Las dos pruebas
 
@@ -86,39 +87,53 @@ ros2 run f1tenth_multiagent_race lap_timer --ros-args -p track_name:="BUDAPEST (
 
 ### Prueba 2 — Obstáculos dinámicos
 
-3 agentes: el ego (`velocidad_max=17`) y 2 autos adicionales corriendo el
-mismo `ftg_control` de la Parte 1 pero con `velocidad_max=4` (velocidad
-moderada), para que el ego sea claramente el auto más rápido/objetivo.
-Esta prueba sí necesita el bridge multi-agente de este paquete
-(`gym_bridge_multi`), ya que el bridge original solo soporta 2 agentes en
-total.
+3 agentes: el ego, corriendo `ftg_control_obstaculos` (`velocidad_max=17`
+— el mismo controlador especializado de la Prueba 1, ya que un auto lento
+adelante se comporta, para efectos de LiDAR, igual que un obstáculo
+pequeño y aislado: sin su cono de proximidad angosto y su histéresis de
+hueco, el ego se queda siguiendo al auto lento en vez de buscar un hueco
+lateral para rebasarlo), y 2 autos adicionales corriendo el `ftg_control`
+original de la Parte 1 a velocidad moderada, ya que ellos no necesitan
+rebasar a nadie. Cada obstáculo usa además `sesgo_lateral` para pegarse
+de forma consistente a un lado del carril — obstaculo_1 a la izquierda,
+obstaculo_2 a la derecha (ver `config/agents_test2_budapest.yaml`) — así
+el ego siempre tiene un hueco ancho y predecible al lado contrario por
+el que rebasar, en vez de que la posición lateral del obstáculo varíe
+con la geometría de cada tramo de pista. Esta prueba sí necesita el
+bridge multi-agente de este paquete (`gym_bridge_multi`), ya que el
+bridge original solo soporta 2 agentes en total.
 
 ```bash
 source ~/F1Tenth-Repository/install/setup.bash
 
 # Terminal 1: bridge multi-agente + RViz + robot_state_publisher (los autos no se mueven todavía)
 ros2 launch f1tenth_multiagent_race multiagent_bridge_launch.py \
-    agents_config:=~/F1Tenth-Repository/src/f1tenth_multiagent_race/config/agents_test2_budapest.yaml \
-    map_path:=~/F1Tenth-Repository/src/f1tenth_gym_ros/maps/Budapest_map
+    agents_config:=$HOME/F1Tenth-Repository/src/f1tenth_multiagent_race/config/agents_test2_budapest.yaml \
+    map_path:=$HOME/F1Tenth-Repository/src/f1tenth_gym_ros/maps/Budapest_map
 
-# Terminal 2: controlador del ego
-ros2 run f1_reactive ftg_control --ros-args \
-    -r /scan:=ego_racecar/scan -r /drive:=ego_racecar/drive \
+# Terminal 2: controlador del ego (versión especializada, para poder rebasar)
+ros2 run f1tenth_multiagent_race ftg_control_obstaculos --ros-args \
+    -r /scan:=/ego_racecar/scan -r /drive:=/ego_racecar/drive \
     -p velocidad_max:=17.0
 
-# Terminal 3: controlador del obstáculo 1 (velocidad moderada)
+# Terminal 3: controlador del obstáculo 1 (velocidad moderada, pegado a la izquierda)
 ros2 run f1_reactive ftg_control --ros-args \
-    -r /scan:=obstaculo_1/scan -r /drive:=obstaculo_1/drive \
-    -p velocidad_max:=4.0
+    -r /scan:=/obstaculo_1/scan -r /drive:=/obstaculo_1/drive \
+    -p velocidad_max:=2.5 -p sesgo_lateral:=1.0
 
-# Terminal 4: controlador del obstáculo 2 (velocidad moderada)
+# Terminal 4: controlador del obstáculo 2 (velocidad moderada, pegado a la derecha)
 ros2 run f1_reactive ftg_control --ros-args \
-    -r /scan:=obstaculo_2/scan -r /drive:=obstaculo_2/drive \
-    -p velocidad_max:=4.0
+    -r /scan:=/obstaculo_2/scan -r /drive:=/obstaculo_2/drive \
+    -p velocidad_max:=2.5 -p sesgo_lateral:=-1.0
 
 # Terminal 5: cronómetro con detección de colisión (ground truth, vía /collisions)
 ros2 run f1tenth_multiagent_race lap_timer --ros-args -p track_name:="BUDAPEST (OBSTÁCULOS DINÁMICOS)"
 ```
+
+Nota: los remaps con barra inicial (`/scan:=...`, `/drive:=...`) son
+obligatorios — sin la barra, el nodo se queda escuchando el tópico
+global en vez del namespaced, y el auto correspondiente no recibe datos
+del LiDAR ni publica comandos de manejo.
 
 El launch de la prueba 2 solo levanta el bridge, RViz, el mapa y los
 modelos de los 3 autos — ningún auto se mueve hasta que lances su
@@ -186,9 +201,7 @@ completos de cada una.
 f1tenth_multiagent_race/
 ├── f1tenth_multiagent_race/
 │   ├── gym_bridge_multi.py               # bridge N-agentes (solo prueba 2)
-│   ├── ftg_node_obstaculos.py            # controlador especializado, prueba 1 (versión actual)
-│   ├── ftg_node_obstaculos_respaldo.py   # respaldo: primer ajuste validado sin choques
-│   ├── ftg_node_obstaculos_respaldo2.py  # respaldo: segundo ajuste validado sin choques
+│   ├── ftg_node_obstaculos.py            # controlador especializado, usado en ambas pruebas
 │   └── lap_timer.py                      # cronómetro + detección de colisión
 ├── launch/
 │   ├── test1_static_obstacles_launch.py  # launch de la prueba 1 (bridge original + mapa con obstáculos)

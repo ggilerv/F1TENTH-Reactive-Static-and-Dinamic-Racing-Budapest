@@ -34,8 +34,6 @@ setup(
         'console_scripts': [
             'gym_bridge_multi = f1tenth_multiagent_race.gym_bridge_multi:main',
             'ftg_control_obstaculos = f1tenth_multiagent_race.ftg_node_obstaculos:main',
-            'ftg_control_obstaculos_respaldo = f1tenth_multiagent_race.ftg_node_obstaculos_respaldo:main',
-            'ftg_control_obstaculos_respaldo2 = f1tenth_multiagent_race.ftg_node_obstaculos_respaldo2:main',
             'lap_timer = f1tenth_multiagent_race.lap_timer:main',
         ],
     },

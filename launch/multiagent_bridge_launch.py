@@ -88,7 +88,7 @@ def _launch_setup(context, *args, **kwargs):
         package='rviz2',
         executable='rviz2',
         name='rviz',
-        arguments=['-d', os.path.join(pkg_share, 'launch', 'gym_bridge.rviz')],
+        arguments=['-d', os.path.join(pkg_share, 'launch', 'multiagent.rviz')],
     ))
 
     actions.append(Node(

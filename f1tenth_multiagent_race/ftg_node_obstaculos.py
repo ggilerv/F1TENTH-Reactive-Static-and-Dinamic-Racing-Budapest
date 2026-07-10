@@ -42,15 +42,16 @@ class FollowTheGapObstaculos(Node):
         self.declare_parameter('factor_umbral_libre', 1.6)
         self.declare_parameter('ventana_suavizado', 3)
         self.declare_parameter('histeresis_hueco', 0.25)
-        self.declare_parameter('cono_proximidad_grados', 100.0)
+        self.declare_parameter('cono_proximidad_grados', 40.0)
 
         self.declare_parameter('velocidad_max', 18.0)
         self.declare_parameter('velocidad_min', 1.2)
         self.declare_parameter('alpha_steering', 0.60)
 
-        self.declare_parameter('a_lat_max', 5.8)
+        self.declare_parameter('a_lat_max', 7.0)
         self.declare_parameter('a_freno_max', 8.5)
         self.declare_parameter('max_aceleracion', 8.5)
+        self.declare_parameter('angulo_muerto_curvatura_grados', 3.5)
         self.declare_parameter('wheelbase', 0.3302)
         self.declare_parameter('max_steering_angle', 0.4189)
         self.declare_parameter('rango_frenado', 12.0)
@@ -102,6 +103,8 @@ class FollowTheGapObstaculos(Node):
         self.A_LAT_MAX = float(gp('a_lat_max').value)
         self.A_FRENO_MAX = float(gp('a_freno_max').value)
         self.MAX_ACCEL = float(gp('max_aceleracion').value)
+        self.ANGULO_MUERTO_CURVATURA_RAD = math.radians(
+            float(gp('angulo_muerto_curvatura_grados').value))
         self.WHEELBASE = float(gp('wheelbase').value)
         self.MAX_STEER = float(gp('max_steering_angle').value)
         self.RANGO_FRENADO = float(gp('rango_frenado').value)
@@ -332,7 +335,16 @@ class FollowTheGapObstaculos(Node):
             finales.append(len(mask) - 1)
 
         if not inicios:
-            self._idx_objetivo_anterior = None
+            # Ningún rayo supera el umbral: el auto está momentáneamente
+            # muy encajonado (típico al cerrarse la burbuja de seguridad
+            # justo al lado de un obstáculo en movimiento). Apuntar al
+            # rayo más lejano de *todo* el escaneo, sin más criterio,
+            # puede mandar el objetivo a una dirección completamente
+            # distinta a la actual de un ciclo a otro; en vez de eso, se
+            # mantiene el objetivo anterior (si existe) para no perder la
+            # referencia de histéresis ni provocar un volantazo.
+            if self._idx_objetivo_anterior is not None:
+                return self._idx_objetivo_anterior
             return int(np.argmax(ranges))
 
         mejor_inicio = inicios[0]
@@ -349,17 +361,25 @@ class FollowTheGapObstaculos(Node):
                     mejor_inicio, mejor_fin = s, e
 
         if self._idx_objetivo_anterior is not None:
-            for s, e in zip(inicios, finales):
-                if s <= self._idx_objetivo_anterior <= e:
-                    largo_actual = e - s + 1
-                    if largo_actual >= mejor_largo / (1.0 + self.HISTERESIS_HUECO):
-                        mejor_inicio, mejor_fin = s, e
-                    break
+            # Hueco más cercano (por centro) a la referencia anterior, no
+            # necesariamente el que la contiene: un obstáculo en
+            # movimiento desplaza los bordes del hueco de un ciclo a
+            # otro, y exigir que la referencia caiga exactamente adentro
+            # deja a la histéresis sin efecto en cuanto el borde se mueve
+            # un poco, permitiendo saltos grandes a un hueco lejano.
+            centros = [(s + e) / 2.0 for s, e in zip(inicios, finales)]
+            dist_centro = [abs(c - self._idx_objetivo_anterior) for c in centros]
+            idx_cercano = int(np.argmin(dist_centro))
+            s, e = inicios[idx_cercano], finales[idx_cercano]
+            largo_cercano = e - s + 1
+            if largo_cercano >= mejor_largo / (1.0 + self.HISTERESIS_HUECO):
+                mejor_inicio, mejor_fin = s, e
 
         segmento = ranges[mejor_inicio:mejor_fin + 1]
         indices_segmento = np.arange(mejor_inicio, mejor_fin + 1)
         centroide = float(np.sum(indices_segmento * segmento) / np.sum(segmento))
         objetivo = int(round(centroide))
+
         self._idx_objetivo_anterior = objetivo
         return objetivo
 
@@ -378,9 +398,18 @@ class FollowTheGapObstaculos(Node):
         (no los 180° completos de `min_dist_bruto`) para no frenar de
         más en curvas cerradas normales, donde la pared queda cerca a
         los costados sin que eso sea peligroso.
+
+        El límite por curvatura (`v_curvatura`) usa una zona muerta
+        (`angulo_muerto_curvatura_grados`) alrededor de 0°: el objetivo de
+        dirección de Follow The Gap casi nunca es exactamente 0° incluso
+        en una recta (oscila unos grados por el ruido normal del
+        algoritmo), así que sin esta zona muerta el auto frenaba fuerte
+        todo el tiempo en recta por un ángulo mínimo que no representa
+        una curva real.
         """
-        if abs(steering_angle) > 1e-3:
-            curvatura = abs(math.tan(steering_angle)) / self.WHEELBASE
+        angulo_efectivo = max(0.0, abs(steering_angle) - self.ANGULO_MUERTO_CURVATURA_RAD)
+        if angulo_efectivo > 1e-3:
+            curvatura = math.tan(angulo_efectivo) / self.WHEELBASE
             v_curvatura = math.sqrt(self.A_LAT_MAX / curvatura)
         else:
             v_curvatura = self.VELOCIDAD_MAX
