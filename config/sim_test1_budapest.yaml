@@ -1,0 +1,42 @@
+# Prueba 1 (Budapest, obstáculos estáticos): un solo agente (ego), con el
+# bridge ORIGINAL de f1tenth_gym_ros (sin modificar). Los 5 obstáculos están
+# dibujados directamente en maps/Budapest_map_obstaculos.png, así que el
+# ego los ve con el LiDAR exactamente igual que a los muros de la pista.
+#
+# Uso:
+#   ros2 launch f1tenth_gym_ros gym_bridge_launch.py
+#   (con este archivo como config/sim.yaml de f1tenth_gym_ros, o pasando
+#    --params-file a gym_bridge directamente — ver README de este paquete)
+
+bridge:
+  ros__parameters:
+    ego_namespace: 'ego_racecar'
+    ego_scan_topic: 'scan'
+    ego_odom_topic: 'odom'
+    ego_opp_odom_topic: 'opp_odom'
+    ego_drive_topic: 'drive'
+    opp_namespace: 'opp_racecar'
+    opp_scan_topic: 'opp_scan'
+    opp_odom_topic: 'odom'
+    opp_ego_odom_topic: 'opp_odom'
+    opp_drive_topic: 'opp_drive'
+
+    scan_distance_to_base_link: 0.0
+
+    scan_fov: 4.7
+    scan_beams: 1080
+
+    map_path: '/home/<tu_usuario>/F1Tenth-Repository/src/f1tenth_multiagent_race/maps/Budapest_map_obstaculos'
+    map_img_ext: '.png'
+
+    num_agent: 1
+
+    sx: 0.0
+    sy: 0.0
+    stheta: -0.70
+
+    sx1: 9.5
+    sy1: 8.5
+    stheta1: 3.14
+
+    kb_teleop: True

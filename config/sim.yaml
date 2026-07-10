@@ -1,0 +1,12 @@
+# Parámetros globales/compartidos del bridge multi-agente.
+# La lista de agentes (ego + obstáculos) vive en config/agents_*.yaml,
+# uno por combinación pista x prueba; el launch los combina en tiempo
+# de ejecución.
+
+bridge:
+  ros__parameters:
+    scan_distance_to_base_link: 0.0
+    scan_fov: 4.7
+    scan_beams: 1080
+    map_img_ext: '.png'
+    kb_teleop: False
